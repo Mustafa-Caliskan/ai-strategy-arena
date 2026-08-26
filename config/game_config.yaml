@@ -1,0 +1,44 @@
+﻿# game_config.yaml — Oyun parametreleri
+
+game:
+  max_turns: 200
+  map_width: 20
+  map_height: 20
+  default_seed: null        # null = rastgele
+
+economy:
+  mine_gold_bonus: 15.0
+  city_gold_bonus: 12.0
+  forest_food_bonus: 8.0
+  city_food_bonus: 6.0
+  army_food_cost_per_unit: 0.5
+  army_gold_upkeep_per_unit: 0.3
+  expand_cost: 40.0
+  economy_action_cost: 60.0
+  base_research_cost: 120.0
+  research_cost_multiplier: 40.0
+
+combat:
+  randomness_factor: 0.25
+  tech_power_bonus_per_level: 0.12
+
+starting_resources:
+  gold: 500.0
+  food: 400.0
+  population: 150
+  army: 80
+  technology: 1
+
+win_conditions:
+  elimination: true
+  score_victory: true
+
+ui:
+  fps: 30
+  tile_size: 32
+  window_width: 1280
+  window_height: 800
+
+logging:
+  level: INFO
+  decision_log_dir: logs/decisions

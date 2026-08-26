@@ -1,0 +1,29 @@
+# agents_config.yaml — AI agent ayarları
+# Model isimleri oyun koduna hard-code edilmez.
+
+agents:
+  - id: AI_A
+    name: "Empire Alpha"
+    provider: openai
+    model: gpt-4o-mini         # DeepSeek için: deepseek-chat
+    temperature: 0.3
+    color: [220, 50, 50]        # RGB Kırmızı
+
+  - id: AI_B
+    name: "Empire Beta"
+    provider: deepseek
+    model: deepseek-chat
+    temperature: 0.3
+    color: [50, 100, 220]       # RGB Mavi
+
+# Desteklenen sağlayıcılar: openai, deepseek, anthropic, google, random
+# random: API gerektirmez, test için kullanın
+
+# Örnek: İki random AI ile test
+# agents:
+#   - id: AI_A
+#     provider: random
+#     model: random-v1
+#   - id: AI_B
+#     provider: random
+#     model: random-v1
