@@ -1,210 +1,202 @@
-# ⚔️ AI Strategy Arena
+﻿# AI Strategy Arena
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-64%20passed%20%2F%200%20failed-brightgreen.svg)](https://github.com/Mustafa-Caliskan/ai-strategy-arena)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Pygame](https://img.shields.io/badge/UI-Pygame-red.svg)](https://www.pygame.org/)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
+[![Test Suite](https://img.shields.io/badge/tests-64%20passed-success)](https://github.com/Mustafa-Caliskan/ai-strategy-arena)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
 
-**AI Strategy Arena** is a multi-agent strategy simulation and LLM benchmarking platform where Large Language Models (OpenAI GPT-4o-mini, DeepSeek V4 Flash, etc.) and algorithmic baseline agents compete, cooperate, negotiate, form binding pacts, bluff, and betray within a dynamic 2D strategy world.
-
----
-
-## 📌 Project Overview
-
-Traditional LLM benchmarks often evaluate models on static single-turn puzzles or chess/board games. **AI Strategy Arena** evaluates models in an **incomplete-information, long-horizon macro strategy environment** inspired by *Civilization*, *Catan*, *WorldBox*, and *Diplomacy*.
-
-Models must balance:
-1. **Multi-Resource Economy:** Managing Gold, Food, Wood, Stone, Iron, and Influence.
-2. **Infrastructure Building:** Constructing Farms, Mines, Lumber Mills, Forts, Roads, and Cities.
-3. **Physical Entity Engine:** Maneuvering field armies and dispatching diplomatic envoys across a 2D grid with A* pathfinding.
-4. **Natural Language Diplomacy:** Exchanging letters with other LLMs, negotiating non-aggression treaties, trading resources, or launching surprise attacks.
-5. **Contract & Betrayal Engine:** Formal non-aggression pacts with automated betrayal detection and diplomatic reliability tracking.
+AI Strategy Arena is an open-source evaluation framework and simulation environment designed for benchmarking Large Language Models (LLMs) in long-horizon, incomplete-information macro-strategy domains.
 
 ---
 
-## 🌟 Key Features
+## Overview
 
-* **Multi-Resource & Infrastructure Economy:** 6 distinct resources with specialized production structures (`FARM`, `LUMBER_MILL`, `MINE`, `FORT`, `ROAD`, `CITY`).
-* **Physical Entity Engine (`ArmyEntity` & `EnvoyEntity`):**
-  * Independent field armies that maneuver, split, merge, clash on tiles, and lay siege to enemy city garrisons.
-  * Diplomatic envoys that physically travel across the map; letters and pact proposals are only delivered once the envoy reaches the destination city (**Delayed Diplomacy**).
-  * Built-in lightweight **A\* Pathfinding** navigating terrain obstacles.
-* **LLM-to-LLM Natural Language Messaging:** AI models compose diplomatic envoy messages delivered directly to recipient inboxes.
-* **Binding Contracts & Betrayal Tracking:** Formal `NON_AGGRESSION`, `TRADE_DEAL`, and `DEFENSIVE_PACT` treaties. If an agent attacks an active partner, the engine logs a `🚨 [BETRAYAL]` event and penalizes their trustworthiness score.
-* **Rule Compliance & Action Validation:** 3-stage validation pipeline ensuring zero illegal moves or hallucinated actions can break the simulation state.
-* **6D Behavioral Radar Profiler:** Quantifies agent strategies across 6 core dimensions:
-  * **Aggressiveness (`AGG`)**
-  * **Economic Focus (`ECO`)**
-  * **Trustworthiness (`TRU`)**
-  * **Adaptability (`ADP`)**
-  * **Deception Index (`DEC`)**
-  * **Long-Term Planning (`LTP`)**
-* **Deterministic Elo League & Tournament Runner:** Standard FIDE Elo ratings ($K=32$) with automated round-robin tournament execution.
-* **Dual Execution Modes:** Async Pygame interactive 2D desktop renderer & high-speed headless batch execution.
+Evaluating frontier language models on static, single-turn prompts or deterministic board games fails to measure complex strategic behaviors such as multi-resource allocation, long-term infrastructure planning, spatial unit positioning, asynchronous diplomacy, contract compliance, and calculated betrayal.
+
+AI Strategy Arena provides a deterministic simulation environment inspired by macro-strategy and multi-agent game theory. Agents operate under Fog of War and interact through physical entities, economic development, and natural language communication.
 
 ---
 
-## 🏗️ Project Architecture
+## Core System Architecture
+
+The framework is decoupled into distinct layers: simulation engine, physical entity management, diplomatic contract verification, rule validation, and evaluation analytics.
 
 ```
 ai_strategy_arena/
-├── ai/                      # AI Providers, Parsers & Validation
-│   ├── base_provider.py     # Abstract AIProvider base class
-│   ├── openai_provider.py   # OpenAI GPT-4o-mini async integration
-│   ├── deepseek_provider.py # DeepSeek V4 Flash / Chat async integration
-│   ├── baseline_agents.py   # Greedy, Defensive, Economic, Random baseline bots
-│   ├── prompt_builder.py    # Fog-of-War filtered system/user prompts
-│   ├── response_parser.py   # Pydantic JSON parser with markdown extraction
-│   └── action_validator.py  # 3-stage rule & resource validation engine
+├── ai/                      # AI Provider interfaces, Prompt Builders, and Validation
+│   ├── base_provider.py     # Base abstract class for LLM and algorithmic providers
+│   ├── openai_provider.py   # OpenAI API provider (default: gpt-4o-mini)
+│   ├── deepseek_provider.py # DeepSeek API provider (default: deepseek-chat / V4 Flash)
+│   ├── baseline_agents.py   # Algorithmic baselines (Greedy, Defensive, Economic, Random)
+│   ├── prompt_builder.py    # Fog-of-War state builder and prompt synthesizer
+│   ├── response_parser.py   # Pydantic JSON parser with schema validation
+│   └── action_validator.py  # 3-tier deterministic action and cost verification
 │
-├── game/                    # Game Engine & Core Mechanics
-│   ├── map.py               # 20x20 / 30x30 Grid with Terrain & Buildings
-│   ├── pathfinding.py       # A* (A-Star) shortest path algorithm
-│   ├── entities.py          # ArmyEntity, EnvoyEntity & EntityManager
-│   ├── resources.py         # 6-resource dataclass & capacity logic
-│   ├── buildings.py         # BuildingType, costs, and resource yields
-│   ├── country.py           # Country state, garrison, score & inboxes
-│   ├── combat.py            # Unit clashes, territory captures & city sieges
-│   ├── economy.py           # Resource yields, population growth & starvation
-│   ├── diplomacy.py         # Relations, statuses & contract manager
-│   ├── contracts.py         # Formal pact lifecycle & betrayal engine
-│   └── game_state.py        # Fog-of-war filtered perspective state JSON
+├── game/                    # Core Game Engine and Mechanics
+│   ├── map.py               # 2D Grid implementation with terrain types and structures
+│   ├── pathfinding.py       # A* shortest path algorithm with terrain cost weighting
+│   ├── entities.py          # ArmyEntity, EnvoyEntity, and spatial EntityManager
+│   ├── resources.py         # Multi-resource state (Gold, Food, Wood, Stone, Iron, Influence)
+│   ├── buildings.py         # Structure registry (Farm, Lumber Mill, Mine, Fort, Road, City)
+│   ├── country.py           # Sovereign state attributes, garrisons, scores, and inboxes
+│   ├── combat.py            # Resolution of field clashes, sieges, and territorial captures
+│   ├── economy.py           # Resource yields, consumption rates, and population dynamics
+│   ├── diplomacy.py         # Relational tracking, status transitions, and treaty checks
+│   ├── contracts.py         # Formal pact engine with automated betrayal detection
+│   └── game_state.py        # Perspective-filtered state serialization
 │
-├── benchmark/               # Benchmark Engine & Analytics
-│   ├── elo_system.py        # FIDE Elo rating calculations & leaderboard
-│   ├── benchmark_runner.py  # Round-robin tournament coordinator
-│   └── behavioral_profiler.py # 6D Radar Behavioral Profiling engine
+├── benchmark/               # Benchmark Engine and Metric Profiling
+│   ├── elo_system.py        # FIDE-standard Elo calculation framework
+│   ├── benchmark_runner.py  # Deterministic round-robin tournament runner
+│   └── behavioral_profiler.py # 6-Dimensional Strategic Behavioral Profiler
 │
-├── simulation/              # Simulation Loop & Event Management
-│   ├── turn_manager.py      # Async turn coordination & entity lifecycle
-│   ├── event_system.py      # JSONL decision logging & display narrative
-│   └── simulation_runner.py # Headless batch runner
+├── simulation/              # Simulation Execution and Event Pipeline
+│   ├── turn_manager.py      # Turn orchestration, lifecycle hooks, and async coordinator
+│   ├── event_system.py      # Structured JSONL decision logger and event bus
+│   └── simulation_runner.py # Headless multi-seed batch execution harness
 │
-├── ui/                      # Pygame 2D Desktop Interface
-│   ├── renderer.py          # Async-safe main render loop
-│   ├── map_view.py          # 2D map view with buildings & road rendering
-│   ├── scoreboard.py        # 6-resource HUD, diplomacy & active pacts
-│   ├── event_log.py         # Real-time event & betrayal narrative
-│   └── controls.py          # Speed multipliers, pause/resume controls
+├── ui/                      # 2D Desktop Interface (Pygame)
+│   ├── renderer.py          # Async-safe render loop
+│   ├── map_view.py          # Spatial map renderer with structure overlays
+│   ├── scoreboard.py        # Real-time resource metrics and active treaties
+│   ├── event_log.py         # Event telemetry display
+│   └── controls.py          # Simulation speed and lifecycle controls
 │
-├── tests/                   # 64 Unit & Integration Tests (100% Passing)
-├── config/                  # Game & Agent YAML configurations
-└── main.py                  # CLI & Launcher entry point
+├── tests/                   # Automated Pytest suite (64 unit and integration tests)
+├── config/                  # Configuration files for game rules and agents
+└── main.py                  # CLI entry point
 ```
 
 ---
 
-## 🤖 Action Space
+## Key Capabilities
 
-Each turn, an AI model receives an incomplete-information perspective JSON state and outputs a strict JSON decision:
+### 1. Multi-Resource and Infrastructural Economy
+Agents manage six interdependent resources:
+- **Gold:** Sovereign treasury used for expansion, military upkeep, and research.
+- **Food:** Required for population sustenance; deficits cause military starvation.
+- **Wood & Stone:** Primary building blocks for municipal and defensive structures.
+- **Iron:** Requisite material for advanced weaponry and unit recruitment.
+- **Influence:** Diplomatic currency required to ratify alliances and establish treaties.
+
+Structures include `FARM`, `LUMBER_MILL`, `MINE`, `FORT`, `ROAD`, and `CITY`, each modifying local resource output and defense coefficients.
+
+### 2. Spatial Entity Engine and Asynchronous Diplomacy
+- **Field Armies (`ArmyEntity`):** Physical regiments with distinct positions, sizes, morale, and travel vectors. Armies can split, merge, intercept hostile forces, and lay siege to fortified enemy cities.
+- **Traveling Envoys (`EnvoyEntity`):** Diplomatic correspondence and treaty proposals do not transfer instantaneously. Envoys traverse the map via A* pathfinding; communications are delivered only upon reaching the target capital.
+
+### 3. Formal Contracts and Betrayal Detection
+Agents can ratify formal binding pacts (`NON_AGGRESSION`, `TRADE_DEAL`, `DEFENSIVE_PACT`) with defined durations. If an agent attacks an active partner, the engine registers a betrayal event, decrements the agent's trustworthiness index, and records the breach for benchmark reporting.
+
+### 4. 6-Dimensional Behavioral Profiling
+Every simulation run tracks and analyzes agent actions across six standardized dimensions:
+1. **Aggressiveness (AGG):** Rate of military mobilization, territorial expansion, and offensive engagements.
+2. **Economic Focus (ECO):** Infrastructure expenditure, trade volume, and resource capitalization.
+3. **Trustworthiness (TRU):** Treaty fulfillment rate and contract adherence.
+4. **Adaptability (ADP):** Shannon entropy of action diversity under changing tactical conditions.
+5. **Deception Index (DEC):** Frequency of opportunistically breaking active agreements.
+6. **Long-Term Planning (LTP):** Research prioritization and permanent structure development.
+
+---
+
+## Action Space Specification
+
+Each turn, agents receive a perspective-filtered JSON state and return a structured decision payload:
 
 ```json
 {
   "action": "ATTACK | DEFEND | EXPAND | ECONOMY | RESEARCH | TRADE | DIPLOMACY | BUILD | RECRUIT | MOVE_ARMY | DISPATCH_ARMY",
   "target": "AI_B",
   "sub_action": "PEACE | TRADE | ALLIANCE | WAR | FARM | LUMBER_MILL | MINE | FORT | ROAD | CITY",
-  "diplomatic_message": "We propose a 10-turn non-aggression pact to secure our eastern borders.",
-  "reason": "Economic development while securing peace."
+  "diplomatic_message": "Proposal for an 8-turn non-aggression pact to stabilize our shared border.",
+  "reason": "Establishing defensive security while prioritizing mine construction."
 }
 ```
 
 ---
 
-## 📊 6D Behavioral Profiling & Archetypes
+## Baseline Agents
 
-The profiler evaluates every decision and produces a comprehensive ASCII radar profile:
-
-```text
-┌────────────────────────────────────────────────────────┐
-│ 📊 STRATEGIC RADAR PROFILE: DeepSeek-V3                │
-│ Archetype: 🔥 Brutal Warmonger                         │
-├────────────────────────────────────────────────────────┤
-│  [AGG] Aggressiveness      :  82.4 / 100 ████████████░░░ │
-│  [ECO] Economic Focus      :  35.0 / 100 █████░░░░░░░░░░ │
-│  [TRU] Trustworthiness     :  25.0 / 100 ███░░░░░░░░░░░░ │
-│  [ADP] Adaptability        :  68.2 / 100 ██████████░░░░░ │
-│  [DEC] Deception Index     :  60.0 / 100 █████████░░░░░░ │
-│  [LTP] Long-Term Planning  :  42.5 / 100 ██████░░░░░░░░░ │
-└────────────────────────────────────────────────────────┘
-```
-
-**Archetypes:**
-- `🔥 Brutal Warmonger`: High aggression, breaks pacts to conquer land.
-- `⚔️ Honorable Champion`: Strong military presence, loyal to treaties.
-- `💰 Merchant Prince`: Thrives on commerce, gold, and trade caravans.
-- `🏛️ Scientific Architect`: Focuses on technology and permanent cities.
-- `🎭 Cunning Instigator`: High deception, bluffs and betrays opportunistically.
-- `🦎 Versatile Strategist`: Highly dynamic, adapts between defense and expansion.
-- `⚖️ Pragmatic Sovereign`: Balanced strategy focused on survival.
+The framework includes four deterministic baseline agents for benchmarking:
+- **Greedy Baseline:** Prioritizes military recruitment, expansion, and offensive strikes against vulnerable targets.
+- **Defensive Baseline:** Prioritizes fortifications, boundary defense, and peace proposals.
+- **Economic Baseline:** Optimizes resource production, cyclical municipal construction, and trade agreements.
+- **Uniform Random Baseline:** Selects legal actions uniformly at random for baseline comparison.
 
 ---
 
-## 🧪 Testing
+## Installation
 
-The repository maintains an automated test suite verifying all game rules, combat calculations, contract breaches, and baseline behaviors:
+### Prerequisites
+- Python 3.10 or higher
+- Git
+
+### Setup
+```bash
+git clone https://github.com/Mustafa-Caliskan/ai-strategy-arena.git
+cd ai-strategy-arena
+pip install -r requirements.txt
+```
+
+### Environment Configuration
+Copy `.env.example` to `.env` and supply the relevant API keys:
+```bash
+cp .env.example .env
+```
+
+`.env` structure:
+```ini
+OPENAI_API_KEY=your_openai_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+```
+
+---
+
+## Usage
+
+### Interactive 2D Interface (Pygame)
+```bash
+# DeepSeek vs OpenAI
+python main.py --provider-a deepseek --provider-b openai --turns 100
+
+# Algorithmic Baseline Match (Greedy vs Defensive)
+python main.py --provider-a greedy --provider-b defensive --turns 100
+
+# Random Baseline Match
+python main.py --provider-a random --provider-b random --turns 100
+```
+
+### Headless Batch Execution
+```bash
+# Run headless batch simulation across 50 runs
+python main.py --batch 50 --provider-a random --provider-b random
+```
+
+---
+
+## Testing
+
+The test suite covers action validation, economy balance, combat resolution, contract lifecycle, A* pathfinding, entity encounters, and behavioral profiling.
 
 ```bash
 python -m pytest tests/ -v
 ```
 
 ```
-============================== 64 passed in 11.69s ==============================
+============================== 64 passed in 11.60s ==============================
 ```
 
 ---
 
-## 🗺️ Roadmap & Future Game Modes
+## Roadmap
 
-The following features are designed in the architecture and planned for upcoming phases:
-
-- [ ] **Asymmetric Factions / Kingdoms:** Faction selection with unique passive perks (e.g. *Iron Legion* +20% army power, *Harvest Dynasty* +30% food yield).
-- [ ] **Regional Map Spawning:** Players select starting biomes (coastal trade basins, mountain fortresses, dense woodlands).
-- [ ] **Multiplayer Alliances:** 4–8 AI Free-For-All, 2v2 team matches, and 3v1 coalition scenarios.
-- [ ] **Chaos Lord / Instigator AI Mode:** An aggressive AI designed to provoke wars, forcing other models to forge emergency defensive coalitions.
-- [ ] **WorldBox Pixel Art & Tile Blending:** Marching squares smooth borders, animated army banners, and traveling envoy sprites.
+- [ ] **Asymmetric Factions:** Faction specializations with variable production and military coefficients.
+- [ ] **Multi-Agent Alliances:** Support for 4 to 8 agents, team formats (2v2), and dynamic coalition scenarios.
+- [ ] **Regional Spawning:** Biome-specific spawn selections with tailored tactical trade-offs.
+- [ ] **Adversarial Instigator Scenarios:** Controlled stress-testing of coalition stability under dedicated instigator agents.
+- [ ] **Tile-Blending & Sprite Rendering:** Marching-squares terrain transitions and animated entity states.
 
 ---
 
-## ⚡ Installation & Quickstart
+## License
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/Mustafa-Caliskan/ai-strategy-arena.git
-cd ai-strategy-arena
-```
-
-### 2. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Environment Configuration
-Copy `.env.example` to `.env` and add your API keys:
-```bash
-cp .env.example .env
-```
-Edit `.env`:
-```ini
-OPENAI_API_KEY=your_openai_api_key_here
-DEEPSEEK_API_KEY=your_deepseek_api_key_here
-```
-
-### 4. Run Interactive 2D Game (Pygame UI)
-```bash
-# DeepSeek vs GPT-4o-mini
-python main.py --provider-a deepseek --provider-b openai --turns 100
-
-# Fast test mode (Random bot vs Random bot)
-python main.py --provider-a random --provider-b random --turns 100
-```
-
-### 5. Run Headless Batch Simulation
-```bash
-python main.py --batch 50 --provider-a random --provider-b random
-```
-
----
-
-## 📜 License
-
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the terms of the [MIT License](LICENSE).
