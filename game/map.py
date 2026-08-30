@@ -1,8 +1,11 @@
-﻿"""
-map.py — Living World Harita Sistemi
-20x20 grid, tile tipleri, yapılar (binalar), yollar, simetrik başlangıç
+"""
+map.py — Living World & Organik Taktiksel Harita Sistemi
+
+20x20 grid üzerinde prosedürel Perlin-tarzı organik kıta, kıvrımlı nehirler,
+taktiksel dağ geçitleri, orman siperleri ve doğal başkent bölgeleri üretir.
 """
 from __future__ import annotations
+import math
 import random
 from enum import Enum
 from dataclasses import dataclass, field
@@ -38,27 +41,26 @@ class Tile:
     def get_defense_bonus(self) -> float:
         bonuses = {
             TileType.LAND:     0.0,
-            TileType.FOREST:   0.15,
-            TileType.MOUNTAIN: 0.35,
-            TileType.MINE:     0.05,
-            TileType.CITY:     0.20,
+            TileType.FOREST:   0.30,  # Orman siperi (Cover)
+            TileType.MOUNTAIN: 0.50,
+            TileType.MINE:     0.10,
+            TileType.CITY:     0.35,  # Şehir surları
             TileType.WATER:    0.0,
         }
         base = bonuses.get(self.tile_type, 0.0)
-        # Kale veya bina bonusu ekle
         if self.building and self.building.building_type == BuildingType.FORT:
-            base += 0.40
+            base += 0.50
         elif self.building and self.building.building_type == BuildingType.CITY:
-            base += 0.25
+            base += 0.30
         return base
 
     def get_resource_bonus(self) -> float:
         bonuses = {
             TileType.LAND:     1.0,
-            TileType.FOREST:   1.2,
-            TileType.MOUNTAIN: 0.6,
-            TileType.MINE:     1.6,
-            TileType.CITY:     1.5,
+            TileType.FOREST:   1.3,
+            TileType.MOUNTAIN: 0.5,
+            TileType.MINE:     1.8,
+            TileType.CITY:     1.6,
             TileType.WATER:    0.0,
         }
         return bonuses.get(self.tile_type, 1.0)
@@ -66,8 +68,8 @@ class Tile:
 
 class GameMap:
     """
-    20x20 grid yaşayan harita.
-    Sol yarı AI_A, sağ yarı AI_B başlangıç bölgesi.
+    20x20 Organik Prosedürel Taktik Haritası.
+    Kıvrımlı kıyılar, nehir geçitleri, dağ sıraları ve doğal başkent çevreleri.
     """
     WIDTH = 20
     HEIGHT = 20
@@ -79,89 +81,117 @@ class GameMap:
         self._generate()
 
     def _generate(self) -> None:
-        """Simetrik ama canlı harita üret."""
-        self.tiles = [[Tile(x, y, TileType.LAND)
-                       for y in range(self.HEIGHT)]
-                      for x in range(self.WIDTH)]
+        """Organik ve taktiksel canlı harita üret."""
+        self.tiles = [[Tile(x, y, TileType.LAND) for y in range(self.HEIGHT)] for x in range(self.WIDTH)]
 
-        self._place_water_edges()
-        self._place_terrain(TileType.FOREST, count=24)
-        self._place_terrain(TileType.MOUNTAIN, count=14)
-        self._place_terrain(TileType.MINE, count=8)
-        self._place_neutral_cities()
-        self._assign_starting_territories()
+        # 1. Organik Kıyı Suları (Perlin-tarzı kavisli okyanus kenarları)
+        self._generate_organic_coastlines()
 
-    def _place_water_edges(self) -> None:
-        """Haritanın üst ve alt kenarına su koy."""
+        # 2. Taktik Dağ Sıraları ve Geçitler (Choke Points)
+        self._generate_mountain_ridges()
+
+        # 3. Kıvrımlı Nehir ve Doğal Köprü Geçitleri
+        self._generate_river_and_bridges()
+
+        # 4. Katmanlı Orman Kümeleri (Doğal Korular)
+        self._generate_forest_groves()
+
+        # 5. Stratejik Maden ve Nötr Köyler
+        self._generate_resource_nodes()
+
+        # 6. Başkentler ve Doğal Çevreleri (Organik dairesel başlangıç)
+        self._assign_organic_territories()
+
+    def _generate_organic_coastlines(self) -> None:
+        """Harita kenarlarında doğal kavisli koylar ve kıyılar üretir."""
         for x in range(self.WIDTH):
-            self.tiles[x][0].tile_type = TileType.WATER
-            self.tiles[x][self.HEIGHT - 1].tile_type = TileType.WATER
+            for y in range(self.HEIGHT):
+                # Merkeze olan mesafe ve gürültü dalgası
+                dist_edge = min(x, self.WIDTH - 1 - x, y, self.HEIGHT - 1 - y)
+                noise = math.sin(x * 0.8 + (self.seed or 0)) * math.cos(y * 0.8)
+                if dist_edge == 0 or (dist_edge == 1 and noise > 0.3):
+                    self.tiles[x][y].tile_type = TileType.WATER
 
-    def _place_terrain(self, tile_type: TileType, count: int) -> None:
-        """Belirli terrain tipini rastgele ama dengeli yerleştir."""
-        placed = 0
-        attempts = 0
-        while placed < count and attempts < 500:
-            attempts += 1
-            x = self._rng.randint(1, self.WIDTH - 2)
-            y = self._rng.randint(1, self.HEIGHT - 2)
-            tile = self.tiles[x][y]
-            if tile.tile_type == TileType.LAND:
-                if x in range(1, 4) or x in range(16, 19):
-                    if tile_type in (TileType.MOUNTAIN, TileType.WATER):
-                        continue
-                tile.tile_type = tile_type
-                placed += 1
+    def _generate_mountain_ridges(self) -> None:
+        """Orta bölgelerde stratejik geçitleri olan dağ sıraları üretir."""
+        # Üst ve alt dağ sırtları
+        for my in [4, 15]:
+            for x in range(3, self.WIDTH - 3):
+                # Geçit noktaları (x=6 ve x=13 geçit olarak açık kalır)
+                if x not in (6, 7, 12, 13) and self.tiles[x][my].is_passable():
+                    if self._rng.random() < 0.75:
+                        self.tiles[x][my].tile_type = TileType.MOUNTAIN
 
-    def _place_neutral_cities(self) -> None:
-        """Orta bölgeye nötr şehirler koy (x=7..12)."""
-        city_positions = [
-            (7, 5), (7, 14), (10, 10), (12, 5), (12, 14)
-        ]
-        for x, y in city_positions:
-            if 0 <= x < self.WIDTH and 0 <= y < self.HEIGHT:
-                t = self.tiles[x][y]
-                t.tile_type = TileType.CITY
-                t.building = Building(BuildingType.CITY)
+    def _generate_river_and_bridges(self) -> None:
+        """Ortadan kıvrılarak akan taktik nehir ve 2 adet stratejik köprü."""
+        mid_x = self.WIDTH // 2
+        for y in range(1, self.HEIGHT - 1):
+            # Hafif kavisli nehir hattı
+            offset = int(math.sin(y * 0.7) * 1.5)
+            rx = max(2, min(self.WIDTH - 3, mid_x + offset))
+            # Köprü noktaları (y=5 ve y=14)
+            if y in (5, 14):
+                self.tiles[rx][y].tile_type = TileType.LAND
+                self.tiles[rx][y].has_road = True
+            else:
+                self.tiles[rx][y].tile_type = TileType.WATER
 
-    def _assign_starting_territories(self) -> None:
-        """AI başlangıç şehirlerini, topraklarını ve temel binalarını belirle."""
-        # AI_A Başkenti
-        self.tiles[2][10].tile_type = TileType.CITY
-        self.tiles[2][10].owner = "AI_A"
-        self.tiles[2][10].building = Building(BuildingType.CITY, level=1)
-        self.tiles[2][10].has_road = True
+    def _generate_forest_groves(self) -> None:
+        """Doğal orman kümeleri serpiştir."""
+        centers = [(4, 8), (5, 12), (15, 8), (14, 12), (10, 2), (10, 17)]
+        for cx, cy in centers:
+            for dx in range(-1, 2):
+                for dy in range(-1, 2):
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
+                        if self.tiles[nx][ny].tile_type == TileType.LAND and self._rng.random() < 0.7:
+                            self.tiles[nx][ny].tile_type = TileType.FOREST
 
-        # AI_B Başkenti
-        self.tiles[17][10].tile_type = TileType.CITY
-        self.tiles[17][10].owner = "AI_B"
-        self.tiles[17][10].building = Building(BuildingType.CITY, level=1)
-        self.tiles[17][10].has_road = True
+    def _generate_resource_nodes(self) -> None:
+        """Maden ve nötr yerleşimleri yerleştir."""
+        mine_spots = [(3, 6), (3, 13), (16, 6), (16, 13), (9, 7), (11, 12)]
+        for mx, my in mine_spots:
+            if self.tiles[mx][my].is_passable():
+                self.tiles[mx][my].tile_type = TileType.MINE
 
-        # AI_A başlangıç toprağı: x=0..4
-        for x in range(0, 5):
-            for y in range(1, self.HEIGHT - 1):
-                t = self.tiles[x][y]
-                if t.tile_type not in (TileType.WATER, TileType.MOUNTAIN):
-                    t.owner = "AI_A"
-        # Başlangıç çiftlikleri ve kereste ocakları
-        self.tiles[2][9].building = Building(BuildingType.FARM)
-        self.tiles[2][11].building = Building(BuildingType.LUMBER_MILL)
-        self.tiles[2][9].has_road = True
-        self.tiles[2][11].has_road = True
+        # Nötr kasabalar
+        city_spots = [(9, 5), (11, 14), (6, 10), (13, 10)]
+        for cx, cy in city_spots:
+            if self.tiles[cx][cy].is_passable():
+                self.tiles[cx][cy].tile_type = TileType.CITY
+                self.tiles[cx][cy].building = Building(BuildingType.CITY, level=1)
+                self.tiles[cx][cy].has_road = True
 
-        # AI_B başlangıç toprağı: x=15..19
-        for x in range(15, self.WIDTH):
-            for y in range(1, self.HEIGHT - 1):
-                t = self.tiles[x][y]
-                if t.tile_type not in (TileType.WATER, TileType.MOUNTAIN):
-                    t.owner = "AI_B"
-        self.tiles[17][9].building = Building(BuildingType.FARM)
-        self.tiles[17][11].building = Building(BuildingType.LUMBER_MILL)
-        self.tiles[17][9].has_road = True
-        self.tiles[17][11].has_road = True
+    def _assign_organic_territories(self) -> None:
+        """Başkentlerin çevresinde organik dairesel etki alanları oluştur."""
+        cap_a = (2, 10)
+        cap_b = (17, 10)
 
-    # ── Sorgulama ve İnşaat ───────────────────────────────────────────
+        # AI_A Dairesel Bölgesi (Yarıçap 3.5)
+        for x in range(self.WIDTH):
+            for y in range(self.HEIGHT):
+                if not self.tiles[x][y].is_passable():
+                    continue
+                dist_a = math.hypot(x - cap_a[0], y - cap_a[1])
+                dist_b = math.hypot(x - cap_b[0], y - cap_b[1])
+
+                if dist_a <= 3.8:
+                    self.tiles[x][y].owner = "AI_A"
+                elif dist_b <= 3.8:
+                    self.tiles[x][y].owner = "AI_B"
+
+        # Başkent binaları ve bağlantı yolları
+        self.tiles[cap_a[0]][cap_a[1]].tile_type = TileType.CITY
+        self.tiles[cap_a[0]][cap_a[1]].owner = "AI_A"
+        self.tiles[cap_a[0]][cap_a[1]].has_road = True
+        self.tiles[cap_a[0]][cap_a[1]].building = Building(BuildingType.CITY, level=2)
+
+        self.tiles[cap_b[0]][cap_b[1]].tile_type = TileType.CITY
+        self.tiles[cap_b[0]][cap_b[1]].owner = "AI_B"
+        self.tiles[cap_b[0]][cap_b[1]].has_road = True
+        self.tiles[cap_b[0]][cap_b[1]].building = Building(BuildingType.CITY, level=2)
+
+    # ── Harita Sorgu Metodları ──────────────────────────────────────
 
     def get_tile(self, x: int, y: int) -> Optional[Tile]:
         if 0 <= x < self.WIDTH and 0 <= y < self.HEIGHT:
@@ -169,87 +199,76 @@ class GameMap:
         return None
 
     def get_tiles_owned_by(self, agent_id: str) -> list[Tile]:
-        result = []
-        for col in self.tiles:
-            for tile in col:
-                if tile.owner == agent_id:
-                    result.append(tile)
-        return result
-
-    def get_territory_count(self, agent_id: str) -> int:
-        return len(self.get_tiles_owned_by(agent_id))
+        return [t for col in self.tiles for t in col if t.owner == agent_id]
 
     def get_border_tiles(self, agent_id: str) -> list[Tile]:
-        owned = set()
-        for col in self.tiles:
-            for t in col:
-                if t.owner == agent_id:
-                    owned.add((t.x, t.y))
-
+        """Komşusu başka bir sahip veya sahipsiz olan sınır tile'ları."""
         borders = []
-        for (x, y) in owned:
-            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
-                nx, ny = x+dx, y+dy
-                if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                    neighbor = self.tiles[nx][ny]
-                    if neighbor.owner != agent_id:
-                        borders.append(self.tiles[x][y])
+        for col in self.tiles:
+            for tile in col:
+                if tile.owner != agent_id:
+                    continue
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nb = self.get_tile(tile.x + dx, tile.y + dy)
+                    if nb and nb.is_passable() and nb.owner != agent_id:
+                        borders.append(tile)
                         break
         return borders
 
     def get_adjacent_unowned(self, agent_id: str) -> list[Tile]:
-        owned = set()
-        for col in self.tiles:
-            for t in col:
-                if t.owner == agent_id:
-                    owned.add((t.x, t.y))
-
-        candidates = []
+        """Sahipli topraklara komşu sahipsiz/nötr tile'lar."""
+        unowned = []
         seen = set()
-        for (x, y) in owned:
-            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
-                nx, ny = x+dx, y+dy
-                if (nx, ny) in seen:
+        for col in self.tiles:
+            for tile in col:
+                if tile.owner != agent_id:
                     continue
-                if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                    t = self.tiles[nx][ny]
-                    if t.owner is None and t.is_passable():
-                        candidates.append(t)
-                        seen.add((nx, ny))
-        return candidates
-
-    def build_structure(self, x: int, y: int, building_type: BuildingType) -> bool:
-        """Tile üzerine yapı inşa et."""
-        tile = self.get_tile(x, y)
-        if not tile or not tile.is_passable():
-            return False
-        if building_type == BuildingType.ROAD:
-            tile.has_road = True
-            return True
-        tile.building = Building(building_type)
-        if building_type == BuildingType.CITY:
-            tile.tile_type = TileType.CITY
-        return True
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nb = self.get_tile(tile.x + dx, tile.y + dy)
+                    if nb and nb.is_passable() and nb.owner is None and (nb.x, nb.y) not in seen:
+                        seen.add((nb.x, nb.y))
+                        unowned.append(nb)
+        return unowned
 
     def capture_tile(self, x: int, y: int, new_owner: str) -> bool:
-        tile = self.get_tile(x, y)
-        if tile and tile.is_passable():
-            tile.owner = new_owner
+        t = self.get_tile(x, y)
+        if t and t.is_passable():
+            t.owner = new_owner
             return True
         return False
 
-    def get_nearby_resources(self, agent_id: str) -> list[str]:
-        owned = self.get_tiles_owned_by(agent_id)
-        resources = []
-        seen = set()
-        for t in owned:
-            for dx in range(-2, 3):
-                for dy in range(-2, 3):
-                    nx, ny = t.x + dx, t.y + dy
-                    if (nx, ny) in seen:
-                        continue
-                    seen.add((nx, ny))
-                    neighbor = self.get_tile(nx, ny)
-                    if neighbor and neighbor.tile_type in (TileType.MINE, TileType.CITY, TileType.FOREST):
-                        resources.append(neighbor.tile_type.value)
-        return list(set(resources))
+    def build_structure(self, x: int, y: int, building_type: BuildingType, owner: Optional[str] = None) -> bool:
+        t = self.get_tile(x, y)
+        if not t or (owner and t.owner != owner) or t.building is not None:
+            return False
+        t.building = Building(building_type, level=1)
+        return True
+
+    def upgrade_structure(self, x: int, y: int, owner: Optional[str] = None) -> bool:
+        t = self.get_tile(x, y)
+        if not t or (owner and t.owner != owner) or not t.building:
+            return False
+        return t.building.upgrade()
+
+    def get_territory_count(self, agent_id: str) -> int:
+        """Belirtilen ülkenin sahip olduğu toplam tile sayısı."""
+        return sum(1 for col in self.tiles for t in col if t.owner == agent_id)
+
+    def get_nearby_resources(self, agent_id: str) -> dict:
+        """Sınırlarına yakın sahipsiz/nötr kaynak sayıları."""
+        nearby = {"mines": 0, "forests": 0, "cities": 0}
+        for tile in self.get_adjacent_unowned(agent_id):
+            if tile.tile_type == TileType.MINE:
+                nearby["mines"] += 1
+            elif tile.tile_type == TileType.FOREST:
+                nearby["forests"] += 1
+            elif tile.tile_type == TileType.CITY:
+                nearby["cities"] += 1
+        return nearby
+
+    def build_road(self, x: int, y: int, owner: Optional[str] = None) -> bool:
+        t = self.get_tile(x, y)
+        if not t or (owner and t.owner != owner) or t.has_road:
+            return False
+        t.has_road = True
+        return True

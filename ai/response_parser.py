@@ -16,6 +16,12 @@ VALID_DIPLOMACY_SUBACTIONS = {"PEACE", "TRADE", "ALLIANCE", "WAR"}
 VALID_BUILDINGS = {"FARM", "LUMBER_MILL", "MINE", "FORT", "ROAD", "CITY"}
 
 
+VALID_UNITS = {
+    "INFANTRY", "ARCHER", "CAVALRY", "CATAPULT", "SPEARMAN", "BOWMAN",
+    "HORSEMAN", "MAGE", "SWORDSMAN", "FIGHTER", "SCOUT", "SHAMAN", "GRUNT", "WARRIOR"
+}
+
+
 class AIDecision(BaseModel):
     """AI yanıtının doğrulanmış modeli."""
     action: str
@@ -27,6 +33,17 @@ class AIDecision(BaseModel):
     dest_y: Optional[int] = None
     split_amount: Optional[int] = None
     reason: Optional[str] = None
+    thought: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_thought_and_reason(cls, data):
+        if isinstance(data, dict):
+            if "thought" in data and not data.get("reason"):
+                data["reason"] = data["thought"]
+            elif "reason" in data and not data.get("thought"):
+                data["thought"] = data["reason"]
+        return data
 
     @field_validator("diplomatic_message")
     @classmethod
@@ -40,7 +57,7 @@ class AIDecision(BaseModel):
     def validate_action(cls, v: str) -> str:
         v = v.upper().strip()
         if v not in VALID_ACTIONS:
-            raise ValueError(f"Invalid action: {v}. Must be one of {VALID_ACTIONS}")
+            return "DEFEND"
         return v
 
     @field_validator("sub_action")
@@ -49,9 +66,9 @@ class AIDecision(BaseModel):
         if v is None or v == "null":
             return None
         v = v.upper().strip()
-        valid_all_subs = VALID_DIPLOMACY_SUBACTIONS | VALID_BUILDINGS
+        valid_all_subs = VALID_DIPLOMACY_SUBACTIONS | VALID_BUILDINGS | VALID_UNITS
         if v not in valid_all_subs:
-            raise ValueError(f"Invalid sub_action: {v}")
+            return v
         return v
 
     @field_validator("target")

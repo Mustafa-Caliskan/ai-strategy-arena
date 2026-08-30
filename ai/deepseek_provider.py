@@ -45,7 +45,7 @@ class DeepSeekProvider(AIProvider):
                 {"role": "user",   "content": user_prompt},
             ],
             temperature=self.temperature,
-            max_tokens=256,
+            max_tokens=1024,
         )
         content = response.choices[0].message.content
         logger.debug(f"[{self.agent_id}] DeepSeek response: {content[:100]}...")

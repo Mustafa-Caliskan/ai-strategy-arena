@@ -1,4 +1,4 @@
-﻿"""
+"""
 openai_provider.py — OpenAI GPT provider
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ class OpenAIProvider(AIProvider):
                 {"role": "user",   "content": user_prompt},
             ],
             temperature=self.temperature,
-            max_tokens=256,
+            max_tokens=1024,
         )
         content = response.choices[0].message.content
         logger.debug(f"[{self.agent_id}] OpenAI response: {content[:100]}...")

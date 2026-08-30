@@ -72,6 +72,8 @@ class TurnManager:
         self.is_running = False
         self.is_paused = False
         self.speed_multiplier = 1.0   # UI tarafından ayarlanır
+        self.telemetry_history: list[dict] = []
+        self.latest_decision: Optional[dict] = None
 
     def get_active_countries(self) -> list["Country"]:
         return [c for c in self.countries if c.is_active()]
@@ -137,9 +139,14 @@ class TurnManager:
         # 0. Fiziksel varlıkların hareketi, çatışmalar ve teslimatlar
         self.entities.step_all(self.game_map, turn, self.events, self.countries, self.combat)
 
-        # 1. Her AI kararını al ve uygula
+        # 1. Haydutlar (BANDITS) Otomatik Saldırı Döngüsü
+        bandit_c = next((c for c in active if c.agent_id == "BANDITS"), None)
+        if bandit_c and bandit_c.is_active():
+            self._process_bandit_turn(bandit_c, active, turn)
+
+        # 2. Her AI kararını al ve uygula
         for country in active:
-            if not country.is_active():
+            if not country.is_active() or country.agent_id == "BANDITS":
                 continue
 
             provider = self.providers.get(country.agent_id)
@@ -149,23 +156,48 @@ class TurnManager:
 
             await self._process_agent_turn(country, provider, active, turn)
 
-        # 2. Ekonomi güncellemesi (tüm aktif ülkeler)
+        # 3. Ekonomi güncellemesi (tüm aktif ülkeler)
         for country in self.get_active_countries():
             result = self.economy.process_turn(country, self.game_map)
             for ev in result.events:
                 self.events.add_narrative(turn, ev)
 
-        # 3. Toprak sayımını güncelle
+        # 4. Toprak sayımını güncelle
         self.win_checker.update_territory_counts(self.countries, self.game_map)
 
-        # 4. Diplomasi ve Paktlar tick
+        # 5. Diplomasi ve Paktlar tick
         pact_events = self.diplomacy.tick_all(turn)
         for pe in pact_events:
             self.events.add_narrative(turn, pe)
 
-        # 5. Hayatta kalma sayacı
+        # 6. Hayatta kalma sayacı
         for country in self.get_active_countries():
             country.turns_survived += 1
+
+    def _process_bandit_turn(self, bandits: "Country", active_countries: list["Country"], turn: int) -> None:
+        """Kara Sancaklı Haydutların otomatik saldırı ve yağma döngüsü."""
+        import math
+        from game.entities import UnitClass, ArmyStatus
+
+        bandit_armies = [a for a in self.entities.armies.values() if a.is_alive() and a.owner == "BANDITS"]
+
+        # 1. Birlik sayısı az ise yeni haydut alayı bas
+        if len(bandit_armies) < 2 and bandits.resources.army >= 20:
+            unit_cls = UnitClass.CAVALRY if (turn % 2 == 0) else UnitClass.INFANTRY
+            self.entities.spawn_army("BANDITS", bandits.capital_x, bandits.capital_y, size=25, unit_class=unit_cls, turn=turn)
+            bandits.resources.army -= 20
+            self.events.add_narrative(turn, f"💀 [BANDIT_RAID] Kara Sancaklı Haydutlar ({unit_cls.value.upper()}) vadiden taarruza geçti!")
+
+        # 2. En yakın medeniyete doğrudan taarruz et
+        target_countries = [c for c in active_countries if c.agent_id != "BANDITS"]
+        if not target_countries:
+            return
+
+        for army in bandit_armies:
+            if army.status != ArmyStatus.ENGAGED:
+                # Hedef olarak başkenti en yakın ülkeyi seç (OpenAI veya DeepSeek)
+                closest_c = min(target_countries, key=lambda c: math.hypot(army.x - c.capital_x, army.y - c.capital_y))
+                self.entities.move_army_towards(army.id, closest_c.capital_x, closest_c.capital_y, self.game_map)
 
     async def _process_agent_turn(
         self,
@@ -175,6 +207,7 @@ class TurnManager:
         turn: int,
     ) -> None:
         """Bir AI agent'ının kararını al ve uygula."""
+        import time
         # Game state oluştur (fog of war ile)
         state = self.state_builder.build(
             turn=turn,
@@ -192,6 +225,7 @@ class TurnManager:
         # API çağrısı (retry mekanizması)
         raw_response = None
         api_error = None
+        start_time = time.perf_counter()
         for attempt in range(1, MAX_API_RETRIES + 1):
             try:
                 self.events.add_narrative(turn, f"{country.agent_id} is thinking...")
@@ -202,6 +236,7 @@ class TurnManager:
                 logger.warning(f"API attempt {attempt}/{MAX_API_RETRIES} failed for {country.agent_id}: {e}")
                 if attempt < MAX_API_RETRIES:
                     await asyncio.sleep(1.0 * attempt)
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
 
         if raw_response is None:
             # Tüm retry'lar başarısız: fallback
@@ -255,10 +290,12 @@ class TurnManager:
             sub_action=validation.sub_action,
         )
 
-        # Diplomatik elçi mesajı varsa fiziksel elçi yola çıkar
+        # Diplomatik elçi mesajı varsa fiziksel elçi yola çıkar (Aynı anda en fazla 1 aktif elçi)
         diplomatic_msg = decision.diplomatic_message if hasattr(decision, "diplomatic_message") else None
         target_id_for_msg = validation.target or decision.target
-        if diplomatic_msg and target_id_for_msg:
+        active_envoys = [e for e in self.entities.envoys.values() if e.owner == country.agent_id and e.status.value == "traveling"]
+
+        if diplomatic_msg and target_id_for_msg and len(active_envoys) == 0:
             target_country = self._find_country(target_id_for_msg, self.countries)
             if target_country and target_country.agent_id != country.agent_id:
                 envoy = self.entities.dispatch_envoy(
@@ -279,7 +316,40 @@ class TurnManager:
                 )
                 country.total_messages_sent += 1
 
+        thought_str = getattr(decision, "thought", None) or getattr(decision, "reasoning", "") or f"{country.agent_id} ordered {effective_action} {validation.sub_action or ''} towards {validation.target or 'frontlines'}."
+
+        # Telemetry kaydet (Web Dashboard Inspector için)
+        telemetry_entry = {
+            "turn": turn,
+            "agent_id": country.agent_id,
+            "agent_name": country.name,
+            "model": getattr(provider, "model_name", "AI"),
+            "latency_ms": round(latency_ms, 1),
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "raw_response": raw_response or "{}",
+            "action": effective_action,
+            "sub_action": validation.sub_action,
+            "target": validation.target,
+            "thought": thought_str,
+            "diplomatic_message": diplomatic_msg,
+            "timestamp": time.strftime("%H:%M:%S"),
+        }
+        self.telemetry_history.append(telemetry_entry)
+        if len(self.telemetry_history) > 200:
+            self.telemetry_history.pop(0)
+
         # Kaydet
+        self.latest_decision = {
+            "agent_id": country.agent_id,
+            "action": effective_action,
+            "sub_action": validation.sub_action,
+            "target": validation.target,
+            "result": result_msg,
+            "thought": thought_str,
+            "diplomatic_message": diplomatic_msg,
+            "turn": turn,
+        }
         self.events.record(
             turn=turn,
             agent_id=country.agent_id,
@@ -337,12 +407,32 @@ class TurnManager:
         elif action == "RECRUIT":
             rec_msg = self.economy.apply_recruit_action(country, amount=20)
             if "recruited" in rec_msg.lower():
+                from game.entities import UnitClass
+                u_class = UnitClass.INFANTRY
+                if sub_action:
+                    sub_low = sub_action.lower()
+                    if "arch" in sub_low:
+                        u_class = UnitClass.ARCHER
+                    elif "cav" in sub_low or "horse" in sub_low:
+                        u_class = UnitClass.CAVALRY
+                    elif "cat" in sub_low or "siege" in sub_low:
+                        u_class = UnitClass.CATAPULT
+                else:
+                    existing = self.entities.get_armies_for(country.agent_id)
+                    classes = [UnitClass.INFANTRY, UnitClass.ARCHER, UnitClass.CAVALRY, UnitClass.INFANTRY, UnitClass.ARCHER, UnitClass.CATAPULT]
+                    u_class = classes[len(existing) % len(classes)]
+
                 army_unit = self.entities.spawn_army(
-                    country.agent_id, country.capital_x, country.capital_y, size=20, turn=turn
+                    country.agent_id, country.capital_x, country.capital_y, size=20, unit_class=u_class, turn=turn
                 )
+                target = next((c for c in active_countries if c.agent_id != country.agent_id), None)
+                if target:
+                    army_unit.set_target(target.capital_x, target.capital_y, self.game_map)
+
+                icon = {"infantry": "🛡️", "archer": "🏹", "cavalry": "🐎", "catapult": "☄️"}.get(u_class.value, "⚔️")
                 self.events.add_narrative(
                     turn,
-                    f"🚩 [ARMY_CREATED] {army_unit.id} ({country.agent_id}) formed at capital ({country.capital_x},{country.capital_y}) [Size: 20]"
+                    f"{icon} [RECRUIT] {army_unit.id} ({u_class.value.upper()}) formed at ({country.capital_x},{country.capital_y}) and marching forward!"
                 )
             return rec_msg
 

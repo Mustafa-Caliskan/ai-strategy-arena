@@ -1,4 +1,4 @@
-﻿"""
+"""
 baseline_agents.py — Standart Kural Tabanlı Baseline Yapay Zeka Ajanları
 Greedy (Saldırgan/Askeri), Defensive (Savunmacı/Barışçıl), Economic (Tüccar/İnşaatçı) ve Random.
 API maliyeti olmadan deterministik benchmark testleri için kullanılır.
@@ -49,7 +49,7 @@ class GreedyProvider(AIProvider):
         if "RECRUIT" in actions and player.get("army", 0) < 140 and player.get("gold", 0) >= 40:
             return json.dumps({
                 "action": "RECRUIT",
-                "reason": "Greedy: Expanding military force."
+                "thought": "Düşman üzerine ezici bir sefer başlatmak için kışlamızda 20 yeni zırhlı birlik eğitiyoruz."
             })
 
         # 2. En zayıf düşmanı bul ve saldır
@@ -58,15 +58,15 @@ class GreedyProvider(AIProvider):
             return json.dumps({
                 "action": "ATTACK",
                 "target": weakest["id"],
-                "reason": f"Greedy: Striking weakest opponent ({weakest['id']}).",
-                "diplomatic_message": "Surrender your lands or be crushed."
+                "thought": f"Düşmanın ({weakest['id']}) sınırlarında açık tespit ettik. Süvarilerimiz ve piyadelerimizle doğrudan taarruz ediyoruz!",
+                "diplomatic_message": "Topraklarınızı teslim edin, ordumuz kapılarınızdadır!"
             })
 
         # 3. Genişle
         if "EXPAND" in actions and player.get("gold", 0) >= 40:
             return json.dumps({
                 "action": "EXPAND",
-                "reason": "Greedy: Expanding territorial borders."
+                "thought": "Sınırlarımızı nehir boyuna ve bereketli topraklara doğru genişletip yeni sınır karakolları kuruyoruz."
             })
 
         # 4. Maden inşa et
@@ -74,23 +74,19 @@ class GreedyProvider(AIProvider):
             return json.dumps({
                 "action": "BUILD",
                 "sub_action": "MINE",
-                "reason": "Greedy: Building iron/gold mine."
+                "thought": "Ordumuzun kılıç ve zırh ihtiyacı için yeni demir ve taş ocakları inşa ediyoruz."
             })
 
         # 5. Ekonomi
         return json.dumps({
             "action": "ECONOMY",
-            "reason": "Greedy: Gathering war funds."
+            "thought": "Büyük askeri sefer hazırlığı için krallığın altın ve erzak rezervlerini artırıyoruz."
         })
 
 
 class DefensiveProvider(AIProvider):
     """
     Savunmacı ve barışçıl bot.
-    Öncelikler:
-    1. Savaşta ise barış teklif et veya DEFEND yap.
-    2. Surları ve çiftlikleri geliştir (BUILD FORT / FARM).
-    3. Saldırmazlık paktları ve ittifaklar ara.
     """
 
     def __init__(self, agent_id: str, seed: Optional[int] = None):
@@ -111,14 +107,14 @@ class DefensiveProvider(AIProvider):
                 "action": "DIPLOMACY",
                 "target": hostile[0]["id"],
                 "sub_action": "PEACE",
-                "reason": "Defensive: Offering peace to end hostility.",
-                "diplomatic_message": "Let us cease bloodshed and restore peace."
+                "thought": "Gereksiz kan dökülmesini durdurmak ve barışı tesis etmek için karşı tarafa barış elçisi gönderiyoruz.",
+                "diplomatic_message": "Savaşa son verelim ve sınırlarımızı barış antlaşmasıyla güvenceye alalım."
             })
 
         if hostile and "DEFEND" in actions:
             return json.dumps({
                 "action": "DEFEND",
-                "reason": "Defensive: Fortifying borders against invasion."
+                "thought": "Düşman akınlarına karşı sınırlarımızdaki taş surları tahkim edip kalkan duvarı örüyoruz."
             })
 
         # Kale veya Çiftlik inşa et
@@ -127,13 +123,13 @@ class DefensiveProvider(AIProvider):
                 return json.dumps({
                     "action": "BUILD",
                     "sub_action": "FORT",
-                    "reason": "Defensive: Building defensive fort."
+                    "thought": "Stratejik geçidi tutmak ve savunmamızı güçlendirmek için heybetli bir taş kale inşa ediyoruz."
                 })
             elif player.get("wood", 0) >= 30:
                 return json.dumps({
                     "action": "BUILD",
                     "sub_action": "FARM",
-                    "reason": "Defensive: Securing food reserves."
+                    "thought": "Olası kuşatmalara karşı halkımızın erzak depolarını ve çiftliklerini büyütüyoruz."
                 })
 
         # Pakt veya İttifak teklif et
@@ -143,13 +139,13 @@ class DefensiveProvider(AIProvider):
                 "action": "DIPLOMACY",
                 "target": target,
                 "sub_action": "ALLIANCE",
-                "reason": "Defensive: Proposing mutual defense pact.",
-                "diplomatic_message": "Our empires are stronger together."
+                "thought": "Bölgemizin huzuru için komşumuzla saldırmazlık ve karşılıklı savunma paktı teklif ediyoruz.",
+                "diplomatic_message": "Krallıklarımız birlikte daha güçlüdür; saldırmazlık paktı imzalayalım."
             })
 
         return json.dumps({
             "action": "DEFEND",
-            "reason": "Defensive: Guarding realm."
+            "thought": "Krallığın sınırlarını gözetleyip barış içinde nöbet tutuyoruz."
         })
 
 

@@ -116,7 +116,7 @@ def create_default_countries() -> list[Country]:
 
     ai_a = Country(
         agent_id="AI_A",
-        name="Empire Alpha",
+        name="OpenAI (GPT-4o)",
         color=(220, 50, 50),     # Kırmızı
         resources=default_resources_a,
         capital_x=2,
@@ -124,10 +124,18 @@ def create_default_countries() -> list[Country]:
     )
     ai_b = Country(
         agent_id="AI_B",
-        name="Empire Beta",
+        name="DeepSeek",
         color=(50, 100, 220),    # Mavi
         resources=default_resources_b,
         capital_x=17,
         capital_y=10,
     )
-    return [ai_a, ai_b]
+    bandits = Country(
+        agent_id="BANDITS",
+        name="Kara Sancaklılar",
+        color=(30, 30, 35),      # Siyah / Kara Sancak
+        resources=Resources(gold=300.0, food=300.0, population=100, army=100, territory=0, technology=1),
+        capital_x=10,
+        capital_y=2,
+    )
+    return [ai_a, ai_b, bandits]

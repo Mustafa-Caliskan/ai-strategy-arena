@@ -204,6 +204,20 @@ async def run_ui(args):
         seed=seed,
     )
 
+    # Web Telemetri Inspector Sunucusunu Baslat (http://localhost:8000)
+    from web_inspector.server import start_web_inspector
+    start_web_inspector(manager, port=8000)
+
+    # Başlangıçta her krallığa ve Kara Sancaklılara hazır alaylar ver
+    from game.entities import UnitClass
+    for c in countries:
+        if c.agent_id == "BANDITS":
+            manager.entities.spawn_army("BANDITS", c.capital_x, c.capital_y, size=35, unit_class=UnitClass.CAVALRY, turn=1)
+        else:
+            manager.entities.spawn_army(c.agent_id, c.capital_x, c.capital_y, size=30, unit_class=UnitClass.INFANTRY, turn=1)
+            offset_x = 1 if c.capital_x < 10 else -1
+            manager.entities.spawn_army(c.agent_id, c.capital_x + offset_x, c.capital_y, size=20, unit_class=UnitClass.ARCHER, turn=1)
+
     renderer = GameRenderer()
     renderer.set_manager(manager)
 
