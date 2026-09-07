@@ -1,4 +1,8 @@
-﻿# Environment variables and API keys
+# ============================================================
+# AI Strategy Arena — .gitignore
+# ============================================================
+
+# Environment variables and API keys (NEVER commit these!)
 .env
 .env.*
 !.env.example
@@ -42,12 +46,21 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Game decision logs & runtime data
+# Game decision logs & runtime data (auto-generated, can be large)
 logs/
 *.jsonl
 *.log
+
 # Local scratch & runtime data
 scratch/
+
+# Wesnoth local installation (too large, user installs separately)
 Wesnoth1.18/
+
+# Temp files
 help.txt
 *.tmp
+*.bak
+
+# Wesnoth map files in wesnoth local install path (keep bridge copies)
+wesnoth/data/

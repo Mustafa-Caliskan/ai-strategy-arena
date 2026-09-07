@@ -274,7 +274,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <body>
     <div class="header">
         <h1>⚡ AI Strategy Arena — 6D Benchmark & Canlı Telemetri</h1>
-        <div class="badge-live"><div class="live-dot"></div> CANLI YAYIN (1s)</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button onclick="generateReport()" class="badge-live" style="background:#3b185f; color:#d8b4fe; border-color:#9333ea; cursor:pointer;">
+                🏁 Benchmark Raporu Üret
+            </button>
+            <a href="/api/export_json" download class="badge-live" style="background:#1e293b; color:#38bdf8; border-color:#0284c7; text-decoration:none; cursor:pointer;">
+                📥 Canlı JSON İndir
+            </a>
+            <div class="badge-live"><div class="live-dot"></div> CANLI YAYIN (1s)</div>
+        </div>
     </div>
 
     <!-- Top State Overview -->
@@ -372,6 +380,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             LTP: "Uzun Vade (LTP)"
         };
 
+        async function generateReport() {
+            try {
+                const res = await fetch("/api/generate_report");
+                const rep = await res.json();
+                alert(`🏁 BENCHMARK RAPORU OLUŞTURULDU!\n\nKazanan: ${rep.winner}\nÖzet: ${rep.verdict}\n\nOpenAI: ${rep.models.OpenAI.archetype}\nDeepSeek: ${rep.models.DeepSeek.archetype}\n\nDosya: logs/reports/benchmark_report_${rep.session_id}.json`);
+            } catch(e) {
+                alert("Rapor oluşturulamadı: " + e);
+            }
+        }
+
         async function fetchStatus() {
             try {
                 const res = await fetch("/api/status");
@@ -434,6 +452,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <div class="res-item"><span class="res-label">Ordu</span><span class="res-val">${r.army || 0} ⚔️</span></div>
                         <div class="res-item"><span class="res-label">Donanma</span><span class="res-val" style="color:var(--accent-openai);">${r.navy || 0} ⚓</span></div>
                         <div class="res-item"><span class="res-label">Köyler</span><span class="res-val">${r.territory || 0} 🌾</span></div>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-bottom:8px; font-size:11px;">
+                        <span style="background:rgba(239,68,68,0.2); color:#fca5a5; padding:2px 6px; border-radius:4px; font-weight:bold;">⚔️ Askeri: Lv${(c.tech && c.tech.MILITARY) || 0}</span>
+                        <span style="background:rgba(16,185,129,0.2); color:#6ee7b7; padding:2px 6px; border-radius:4px; font-weight:bold;">💰 Ekonomi: Lv${(c.tech && c.tech.ECONOMIC) || 0}</span>
+                        <span style="background:rgba(59,130,246,0.2); color:#93c5fd; padding:2px 6px; border-radius:4px; font-weight:bold;">⚓ Deniz: Lv${(c.tech && c.tech.NAVAL) || 0}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:8px;">
                         <span>Çiftlik: ${r.farms || 0} | Maden: ${r.mines || 0}</span>

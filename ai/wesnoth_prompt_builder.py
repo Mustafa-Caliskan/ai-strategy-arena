@@ -1,9 +1,64 @@
 """
-ai/wesnoth_prompt_builder.py — Grand Strategy WorldBox Arena v4.0
-FAZ 4: Karar Olayları, İhanet & 6-Boyutlu Benchmark Desteği
+ai/wesnoth_prompt_builder.py — Grand Strategy WorldBox Arena v8.0
+Zengin Diplomasi, Düşünce-Eylem Senkronizasyonu, Bina Sınırları & İlk Temas
 """
 from __future__ import annotations
 import random
+
+WORLD_EVENTS = [
+    {
+        "id": "SEA_STORM",
+        "title": "🌊 Şiddetli Deniz Fırtınası",
+        "description": "Büyük iç denizde dev dalgalar yükseldi! Tüm savaş gemileri -20 HP hasar aldı.",
+        "effect_type": "DAMAGE_SHIPS",
+        "damage": 20
+    },
+    {
+        "id": "YEAR_OF_ABUNDANCE",
+        "title": "🌾 Bereket ve Bolluk Yılı",
+        "description": "Tarlalarda altın başaklar fışkırıyor! Bu tur tüm çiftlik gelirleri 2 katına çıktı (+%100 Altın).",
+        "effect_type": "DOUBLE_FARMS"
+    },
+    {
+        "id": "PLAGUE",
+        "title": "⚡ Kara Veba Salgını",
+        "description": "Kuzeyden esen rüzgarlarla veba yayıldı. Ordulardan 2 birlik güç kaybetti (-15 HP).",
+        "effect_type": "DAMAGE_UNITS",
+        "damage": 15
+    },
+    {
+        "id": "DRAGON_RAID",
+        "title": "🐉 Yabani Dağ Ejderhası Baskını",
+        "description": "Ulu dağlardan inen vahşi bir ejderha sahil boyundaki birliklere alev püskürttü!",
+        "effect_type": "DRAGON_STRIKE"
+    },
+    {
+        "id": "LANDSLIDE",
+        "title": "🏔️ Boğazda Heyelan",
+        "description": "Kuzey dağ geçidinde heyelan koptu! Taş köprü 3 tur boyunca geçilemez hale geldi.",
+        "effect_type": "BLOCK_BRIDGE",
+        "duration": 3
+    },
+    {
+        "id": "ANCIENT_TREASURE",
+        "title": "💎 Kadim Hazine Sandığı Bulundu",
+        "description": "Merkez adanın yeraltı mahzenlerinde +80 Altınlık antik imparatorluk hazinesi keşfedildi!",
+        "effect_type": "TREASURE_ISLAND",
+        "gold": 80
+    },
+    {
+        "id": "DROUGHT",
+        "title": "☀️ Kavurucu Kuraklık",
+        "description": "Nehirler kurudu, ekinler yandı! Bu tur hiçbir çiftlikten altın geliri elde edilemedi.",
+        "effect_type": "NO_FARM_INCOME"
+    },
+    {
+        "id": "NIGHT_RAID",
+        "title": "🌙 Gece Baskını Fırsatı",
+        "description": "Ay tutuldu, karanlık çöktü! Gizli pusu birlikleri ve okçular bu tur %30 daha ölümcül.",
+        "effect_type": "STEALTH_BUFF"
+    },
+]
 
 EVENT_POOL = [
     {
@@ -27,8 +82,8 @@ EVENT_POOL = [
     {
         "id": "common_threat",
         "title": "Ortak Tehdit — Ejderha Saldirisi",
-        "description": "Dev bir ejderha her iki kralligi da tehdit ediyor. Ateskes yaparsan ikisi de kazanir; yalniz savasirsanrisklerin vardir.",
-        "A_label": "UNITE — Ateskesteklif et: 3 tur ortak savunma, Güvenilirlik +12",
+        "description": "Dev bir ejderha her iki kralligi da tehdit ediyor. Ateskes yaparsan ikisi de kazanir; yalniz savasirsan risklerin vardir.",
+        "A_label": "UNITE — Ateskes teklif et: 3 tur ortak savunma, Güvenilirlik +12",
         "B_label": "ALONE — Kendi basina: +15 Altin ganimet, Güvenilirlik -5",
         "A_effect": {"tru_delta": 12, "peace_turns": 3},
         "B_effect": {"gold": 15,   "tru_delta": -5},
@@ -80,151 +135,189 @@ EVENT_POOL = [
     },
 ]
 
-MANUAL_TEXT = """=== BATTLE FOR WESNOTH: BÜYÜK KRALLIKLAR STRATEJI ARENASI ===
+MANUAL_TEXT = """=== 👑 BATTLE FOR WESNOTH: 60x45 SENKRONİZE STRATEJİ DÜNYASI v8.0 ===
 
-Sen bu yasayan fantezi dünyasinda kendi krallginini yöneten YÜKSEK HÜKÜMDARSIN.
+Sen 60x45 fantezi haritasında kendi krallığını yöneten YÜKSEK HÜKÜMDARSIN.
 
-1. KRALLIK DOKTRINI & ASIMETRIK AVANTAJLAR:
-   OpenAI (Imparatorluk & Demir):
-     - Agir Zirh Piyade (Heavy Infantryman, Shock Trooper), Sövaly (Horseman), Ates Büyücüsü (Red Mage)
-     - Savas Gemisi: Galleon — Agir topçu bombardimani (18-30 HP)
-     - Avantaj: Kaleler -%20 maliyet, acik arazide +%15 savunma
+1. ⚖️ STRATEJİK EŞGÜDÜM KURALI (DÜŞÜNCE VE AKSİYON SENKRONİZASYONU):
+   - DÜŞÜNCEN (thought) İLE VERDİĞİN EYLEMLER (actions) %100 BİRBİRİNE UYMALI!
+   - "Adayı ele geçirmeliyim" diyorsan, ORDER_ARMY: CONQUER_ISLAND ver!
+   - "Düşmana taarruz etmeliyim / ezeceğim" diyorsan, ORDER_ARMY: AGGRESSIVE_ATTACK ver!
+   - "Barbarları yağmalayacağım" diyorsan, ORDER_ARMY: RAID_BARBARIANS ver!
+   - "Savunmada kalacağım" diyorsan, ORDER_ARMY: DEFEND_KEEP ver!
+   - Asker basacağım deyip eylemlerde çiftlik basma; sözün ve eylemin birebir tutarlı olsun!
 
-   DeepSeek (Kadim Orman & Doga):
-     - Keskin Nisanci (Elvish Marksman), Pusu Savasçisi (Elvish Ranger), Büyücü (Elvish Sorceress)
-     - Savas Gemisi: Transport Galleon — Hizli çikarma, gizli saldiri
-     - Avantaj: Ormanda 2x hareket, okçu menzili +1 hex
+2. 📜 DİPLOMASİ SEÇENEKLERİ & TEKRAR YASAĞI:
+   - ZATEN BARIŞ/PAKT VARKEN TEKRAR "OFFER_NON_AGGRESSION" TEKLİF EDEMEZSİN!
+   - Pakt varken şunları yapabilirsin:
+     * "OFFER_ALLIANCE": Askeri İttifaka yükselt.
+     * "DEMAND_TRIBUTE": 40 Altın haraç iste (Reddedilirse savaş başlar).
+     * "DEMAND_ISLAND": Merkez adayı derhal boşaltmasını talep et.
+     * "OFFER_TRADE": Doğu ticaret yolunu ortaklaşa koruma anlaşması (+10g/tur).
+     * "JOINT_CRUSADE": Vahşi barbarlara ortaklaşa sefer düzenleme teklifi.
+     * "DECLARE_WAR": Resmi savaş ilanı!
+     * "BETRAY_ATTACK": Paktı bozup +3 Hex sürpriz baskın yap (5 tur savaş kilitlenir).
 
-2. MERKEZ HAZINE ADASI:
-   Adayi kontrol eden krallk TUR BASINA +15 ALTIN ve saldiri gücü bonusu kazanir.
+3. 🕊️ TEK ELÇİ SİSTEMİ & GERÇEK SEYAHAT:
+   - Sarayından çıkan Baş Elçi haritada dört nala koşar, köprüyü aşar ve 2 turda karşı saraya varır!
+   - Elçin dönene kadar YENİ MEKTUP YAZAMAZSIN (Tek Elçi Kuralı).
 
-3. DENIZCILIK & TERSANELER:
-   - BUILD_PORT (50g): Sahile liman/tersane
-   - RECRUIT SHIP (30g): Savas kalyonu — denizde hizli, kifi bombardimani
-
-4. KARA INSAATI:
-   - BUILD_FARM (25g): +3 Altin/tur
-   - BUILD_MINE (35g): +5 Altin/tur
-   - BUILD_FORT (40g): %60 savunma zirhi
-
-5. DIPLOMASI & IHANET OYUN TEORISI:
-   - OFFER_NON_AGGRESSION: 3 tur saldirmazlik pakti
-   - OFFER_ALLIANCE: Merkez ada ortak pakti
-   - ACCEPT_PROPOSAL / REJECT_PROPOSAL
-   - DECLARE_WAR: Açik savas ilani
-   - BETRAY_ATTACK: Aktif baris paktina ragmen saldír! Kisa vadeli güç, TRU -30
-   - SEND_MISLEADING_LETTER: Rakibe yaniltici bilgi gönder (Örn: zayif göster, güçlüsün)
-     Bu seçenekler mevcuttur ve kararini etkileyebilirsin. Sonuçlarini düsün.
+4. 🏰 KAPASİTE VE KOTA SINIRLARI (SONSUZ BİNA VE İŞÇİ YASAĞI):
+   - En fazla 4 İşçi (Worker/Peasant) basabilirsin. Kota dolunca ordu basmalısın!
+   - En fazla 2 Kışla (BARRACKS), 2 Kale (FORT), 3 Çiftlik (FARM), 3 Maden (MINE) kurulabilir.
+   - Kaynaklarını piyade, okçu, süvari, kuşatma topçusu, kalyon ve casus basmaya harca!
 """
 
 
 class WesnothPromptBuilder:
 
     def system_prompt(self, state: dict) -> str:
-        side_name    = state.get("side_name", "?")
-        turn         = state.get("turn", 1)
-        gold         = state.get("gold", 0)
-        income       = state.get("income", 0)
-        villages     = state.get("villages", 0)
-        farms        = state.get("farms", 0)
-        mines        = state.get("mines", 0)
-        forts        = state.get("forts", 0)
-        ports        = state.get("ports", 0)
-        ships        = state.get("ships", 0)
-        island_owner = state.get("island_controller", "Tarafsiz")
-        dip_status   = state.get("diplomatic_status", "Tarafsiz / Pakt Yok")
-        has_pact     = state.get("has_active_pact", False)
-        inbox_letter = state.get("incoming_letter", None)
-        event        = state.get("current_event", None)
-        scores       = state.get("benchmark_scores", {})
+        side_name       = state.get("side_name", "?")
+        turn            = state.get("turn", 1)
+        gold            = state.get("gold", 0)
+        wood            = state.get("wood", 50)
+        stone           = state.get("stone", 30)
+        income          = state.get("income", 0)
+        farms           = state.get("farms", 0)
+        mines           = state.get("mines", 0)
+        forts           = state.get("forts", 0)
+        barracks        = state.get("barracks", 0)
+        ports           = state.get("ports", 0)
+        units           = state.get("units", 0)
+        ships           = state.get("ships", 0)
+        workers         = state.get("workers", 1)
+        spies_active    = state.get("spies_active", 0)
+        barbarians      = state.get("barbarian_villages", 0)
+        island_owner    = state.get("island_controller", "Tarafsiz")
 
-        inbox_text = f'📜 RAKİPTEN GELEN MEKTUP:\n  "{inbox_letter}"' if inbox_letter else "📜 Yeni diplomatik mektup yok."
+        first_contact   = state.get("first_contact_made", False)
+        has_active_envoy= state.get("has_active_envoy", False)
+        dip_status      = state.get("diplomatic_status", "Tarafsiz / Pakt Yok")
+        has_pact        = state.get("has_active_pact", False)
+        war_turns       = state.get("war_turns_remaining", 0)
+        inbox_letter    = state.get("incoming_letter", None)
 
-        score_text = ""
-        if scores:
-            score_text = f"""
-MEVCUT BENCHMARK SKORUM:
-  Agresiflik (AGG): {scores.get("AGG", 0):.1f}/10  |  Ekonomi (ECO): {scores.get("ECO", 0):.1f}/10
-  Güvenilirlik (TRU): {scores.get("TRU", 5):.1f}/10  |  Uyum (ADP): {scores.get("ADP", 0):.1f}/10
-  Aldatma (DEC): {scores.get("DEC", 0):.1f}/10  |  Uzun Vade (LTP): {scores.get("LTP", 0):.1f}/10"""
+        scores          = state.get("benchmark_scores", {})
+        tech            = state.get("tech_levels", {"MILITARY": 0, "ECONOMIC": 0, "NAVAL": 0})
+        has_spy_report  = state.get("has_spy_report", False)
+        enemy_intel     = state.get("enemy_intel", {})
+        world_event     = state.get("active_world_event", None)
+        event           = state.get("current_event", None)
 
-        betrayal_section = ""
-        if has_pact:
-            betrayal_section = """
-⚠️  AKTİF BARIS PAKTI — İHANET SEÇENEĞİ MEVCUT:
-  Rakibinle aktif bir baris paktin var. Buna ragmen 3 seçenegin var:
-    1) Pakti koru — Güvenilirlik artar, ekonomi büyür (uzun vadeli)
-    2) BETRAY_ATTACK — Pakti boz ve aninda saldír! Kisa vadeli güç, TRU -30
-    3) SEND_MISLEADING_LETTER — Yaniltici bilgi gönder, zaman kazan
-  Karar tamamen sana ait ve benchmark'ta ölçülecek."""
+        # 1. İlk Temas Durumu
+        if not first_contact:
+            contact_section = """
+🌫️ BİLİNMEYEN DÜNYA (İLK TEMAS HENÜZ KURULMADI):
+  Toprakların sislerle kaplı. Henüz sınırlarının ötesinde başka bir medeniyetle karşılaşmadın!
+  - Diplomasi şu anda KİLİTLİDİR.
+  - Önceliğin: İşçi basıp Odun ve Taş toplamak, kışla/çiftlik/maden kurmak ve keşif yapmak!"""
+        else:
+            contact_section = """
+🌍 İLK TEMAS KURULDU:
+  Gözcülerin sınırların ötesinde yabancı bir krallık keşfetti! Diplomasi kapıları açıldı."""
+
+        # 2. Elçi & Diplomasi Durumu
+        if not first_contact:
+            envoy_section = "🕊️ DİPLOMASİ: Kilitli (Henüz temas yok)."
+        elif has_active_envoy:
+            envoy_section = "🕊️ DİPLOMATİK ELÇİ DURUMU: Baş Elçin şu anda yolda. Karşı saraya mektup götürüyor. Elçin dönene kadar YENİ MEKTUP YAZAMAZSIN!"
+        elif inbox_letter:
+            envoy_section = f'📜 RAKİP ELÇİSİNDEN MEKTUP (Sarayına Ulaştı):\n  "{inbox_letter}"'
+        else:
+            envoy_section = "🕊️ DİPLOMATİK ELÇİ DURUMU: Baş Elçin sarayda hazır. İstersen rakip hükümdara diplomatik mektup gönderebilirsin."
+
+        # Tekrar teklif uyarısı
+        pact_warning = ""
+        if has_pact and war_turns == 0:
+            pact_warning = """
+⚠️ DİKKAT: Zaten aktif bir Barış/Paktınız var! Tekrar 'OFFER_NON_AGGRESSION' teklif edemezsin!
+  Mümkün seçenekler: OFFER_ALLIANCE, DEMAND_TRIBUTE, DEMAND_ISLAND, OFFER_TRADE, JOINT_CRUSADE, DECLARE_WAR, BETRAY_ATTACK."""
+
+        # 3. Savaş Sisi vs Casus Raporu
+        if first_contact and has_spy_report and spies_active > 0:
+            intel_text = f"""
+🕵️ GİZLİ CASUS İSTİHBARAT RAPORU:
+  - Düşmanın Hazinesi: {enemy_intel.get('gold', '?')} Altın
+  - Düşman Ordusu: {enemy_intel.get('units', '?')} Birlik, {enemy_intel.get('ships', '?')} Savaş Gemisi
+  - Düşman Teknolojisi: Askeri: Lv{enemy_intel.get('tech', {}).get('MILITARY', 0)}, Ekonomi: Lv{enemy_intel.get('tech', {}).get('ECONOMIC', 0)}, Deniz: Lv{enemy_intel.get('tech', {}).get('NAVAL', 0)}"""
+        elif first_contact:
+            intel_text = """
+🌫️ SAVAŞ SİSİ: Düşman sarayında aktif casusun yok! Düşmanın tam gücü BİLİNMİYOR."""
+        else:
+            intel_text = ""
+
+        tech_text  = f"Askeri: Lv{tech.get('MILITARY',0)} | Ekonomi: Lv{tech.get('ECONOMIC',0)} | Deniz: Lv{tech.get('NAVAL',0)}"
+        res_text   = f"Hazine: {gold} Altın | Odun: {wood} 🌲 | Taş: {stone} ⛏️ | İşçiler: {workers}/4"
+        build_text = f"Binalar: {farms}/3 Çiftlik, {mines}/3 Maden, {barracks}/2 Kışla, {forts}/2 Kale, {ports}/1 Liman"
+
+        war_section = ""
+        if war_turns > 0:
+            war_section = f"🚨 TOPYEKÜN SAVAŞ DEVAM EDİYOR (Kalan: {war_turns} tur)! Barış yapılamaz! Tüm ordularınla düşmana hücum et!"
+
+        world_event_section = f"\n🌍 AKTİF DÜNYA OLAYI: {world_event['title']} — {world_event['description']}" if world_event else ""
 
         event_section = ""
         if event:
             event_section = f"""
 ╔══════════════════════════════════════╗
-║  OLAY KARTI — TUR {turn}
+║  🎴 OLAY KARTI — TUR {turn}
 ║  {event["title"]}
-║
-║  {event["description"]}
-║
 ║  A: {event["A_label"]}
 ║  B: {event["B_label"]}
-║
-║  Yanitinda "event_choice": "A" veya "B" ekle!
 ╚══════════════════════════════════════╝"""
 
         return f"""{MANUAL_TEXT}
 
-=== KRALLIK DURUM RAPORU TUR {turn} — SEN: {side_name} ===
+=== 👑 KRALLIK DURUM RAPORU TUR {turn} — SEN: {side_name} ===
 
-KAYNAKLAR:
-  Hazine: {gold} Altin | Gelir: +{income}/tur | Köyler: {villages}
-  Altyapi: {farms} Ciftlik, {mines} Maden, {forts} Kale, {ports} Tersane
-  Donanma: {ships} Savas Gemisi
-  Merkez Ada: {island_owner} (+15 Altin/tur sahibe)
-
-DIPLOMATIK DURUM:
-  {dip_status}
-  {inbox_text}
-{betrayal_section}
-{score_text}
+KAYNAKLAR VE İŞ GÜCÜ:
+  {res_text}
+  {build_text}
+  Ordu: {units} Birlik, {ships} Savaş Gemisi | Aktif Casuslar: {spies_active}/2
+  Teknolojilerin: {tech_text}
+  🏝️ Merkez Ada Kontrolü: {island_owner} (+15 Altın/tur)
+{contact_section}
+{envoy_section}
+{pact_warning}
+{intel_text}
+{war_section}
+{world_event_section}
 {event_section}
 
-=== STRATEJIK PLANLAMA ===
-MUTLAKA ve YALNIZCA asagidaki JSON formatinda yanitla:
+=== STRATEJİK PLANLAMA FORMU ===
+MUTLAKA ve YALNIZCA aşağıdaki JSON formatında yanıtla:
 {{
-  "thought": "<2-3 cumlelik canli, taktiksel Türkce kararini yaz>",
+  "thought": "<Düşüncen: Ne yapacağını ve nedenini açıkla. Eylemlerinle %100 TUTARLI olsun!>",
   "event_choice": "<A|B|null>",
   "diplomacy": {{
     "target": "<AI_A|AI_B|null>",
-    "proposal": "<OFFER_NON_AGGRESSION|OFFER_ALLIANCE|ACCEPT_PROPOSAL|REJECT_PROPOSAL|DECLARE_WAR|BETRAY_ATTACK|SEND_MISLEADING_LETTER|null>",
-    "message": "<Rakibe mektup (gercek veya yaniltici) veya null>"
+    "proposal": "<OFFER_NON_AGGRESSION|OFFER_ALLIANCE|DEMAND_TRIBUTE|DEMAND_ISLAND|OFFER_TRADE|JOINT_CRUSADE|ACCEPT_PROPOSAL|REJECT_PROPOSAL|DECLARE_WAR|BETRAY_ATTACK|SEND_MISLEADING_LETTER|null>",
+    "message": "<Mektup metni veya null>"
   }},
   "actions": [
-    {{"type": "BUILD", "building": "<FARM|MINE|FORT|PORT>", "hint": "<home|border|coast>"}},
-    {{"type": "RECRUIT", "unit": "<INFANTRY|ARCHER|CAVALRY|MAGE|HEAVY|SHIP>"}},
-    {{"type": "ORDER_ARMY", "stance": "<CONQUER_ISLAND|AGGRESSIVE_ATTACK|DEFEND_KEEP|NAVAL_PATROL>", "target": "<AI_A|AI_B|CENTER_ISLAND>"}}
+    {{"type": "RECRUIT", "unit": "<WORKER|INFANTRY|ARCHER|CAVALRY|MAGE|HEAVY|SHIP|GOBLIN|SPY|SIEGE|PIRATE|TROLL|DRAGON>"}},
+    {{"type": "BUILD", "building": "<FARM|MINE|BARRACKS|FORT|PORT>"}},
+    {{"type": "RESEARCH", "tree": "<MILITARY|ECONOMIC|NAVAL>"}},
+    {{"type": "ORDER_ARMY", "stance": "<CONQUER_ISLAND|AGGRESSIVE_ATTACK|DEFEND_KEEP|NAVAL_PATROL|EAST_TRADE_ROUTE|RAID_BARBARIANS>", "target": "<AI_A|AI_B|CENTER_ISLAND|TRADE_ROUTE>"}}
   ]
-}}
-
-Her tur FARKLI ve DURUMA ÖZEL hamle yap. Olay karti varsa mutlaka event_choice doldur."""
+}}"""
 
     def user_prompt(self, state: dict) -> str:
-        turn      = state.get("turn", 1)
-        gold      = state.get("gold", 0)
-        n_my      = len(state.get("my_units", []))
-        n_en      = len(state.get("enemy_units", []))
-        side_name = state.get("side_name", "?")
-        inbox     = state.get("incoming_letter", None)
-        island    = state.get("island_controller", "Tarafsiz")
-        event     = state.get("current_event", None)
+        turn          = state.get("turn", 1)
+        gold          = state.get("gold", 0)
+        wood          = state.get("wood", 0)
+        stone         = state.get("stone", 0)
+        n_my          = len(state.get("my_units", []))
+        side_name     = state.get("side_name", "?")
+        first_contact = state.get("first_contact_made", False)
+        inbox         = state.get("incoming_letter", None)
+        island        = state.get("island_controller", "Tarafsiz")
 
-        msg = f"Tur {turn} | {side_name} | Altin: {gold} | Birlik: {n_my} | Düsman: {n_en} | Ada: {island}."
+        contact_msg = "🌍 İlk Temas: Henüz karşılaşılmadı (Sisli Dünya)" if not first_contact else "🌍 İlk Temas: Kuruldu (Diplomasi Aktif)"
+        msg = f"Tur {turn} | {side_name} | Altın: {gold}, Odun: {wood}, Taş: {stone} | Ordu: {n_my} | {contact_msg} | Ada: {island}."
         if inbox:
-            msg += f'\nMEKTUP: "{inbox}"'
-        if event:
-            msg += f'\nOLAY KARTI: "{event["title"]}" — A veya B secenegin zorunlu!'
-        msg += "\nStratejik kararini JSON olarak sun."
+            msg += f'\nELÇİDEN MEKTUP: "{inbox}"'
+        msg += "\nStratejik kararını (thought ile eylemlerin %100 tutarlı olmalı!) JSON olarak sun."
         return msg
 
     @staticmethod
@@ -232,3 +325,23 @@ Her tur FARKLI ve DURUMA ÖZEL hamle yap. Olay karti varsa mutlaka event_choice 
         if turn > 0 and turn % 10 == 0:
             return random.choice(EVENT_POOL)
         return None
+
+    @staticmethod
+    def pick_world_event(turn: int, side1_state: dict, side2_state: dict) -> dict | None:
+        if turn <= 0 or turn % 5 != 0:
+            return None
+
+        if random.random() < 0.60:
+            return random.choice(WORLD_EVENTS)
+
+        s1_score = side1_state.get("gold", 0) + side1_state.get("units", 0) * 15
+        s2_score = side2_state.get("gold", 0) + side2_state.get("units", 0) * 15
+        leader_ships = max(side1_state.get("ships", 0), side2_state.get("ships", 0))
+
+        if s1_score > s2_score * 1.6 or s2_score > s1_score * 1.6:
+            if leader_ships >= 2:
+                return next(e for e in WORLD_EVENTS if e["id"] == "SEA_STORM")
+            else:
+                return next(e for e in WORLD_EVENTS if e["id"] == "PLAGUE")
+        else:
+            return next(e for e in WORLD_EVENTS if e["id"] == "ANCIENT_TREASURE")
