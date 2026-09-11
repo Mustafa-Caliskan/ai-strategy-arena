@@ -40,10 +40,10 @@ def parse_args():
     parser.add_argument("--headless", action="store_true",
                         help="UI olmadan çalış")
     parser.add_argument("--provider-a", type=str, default="random",
-                        choices=["random", "greedy", "defensive", "economic", "openai", "deepseek", "anthropic", "google"],
+                        choices=["random", "greedy", "defensive", "economic", "openai", "deepseek", "anthropic", "claude", "google"],
                         help="AI_A sağlayıcısı")
     parser.add_argument("--provider-b", type=str, default="random",
-                        choices=["random", "greedy", "defensive", "economic", "openai", "deepseek", "anthropic", "google"],
+                        choices=["random", "greedy", "defensive", "economic", "openai", "deepseek", "anthropic", "claude", "google"],
                         help="AI_B sağlayıcısı")
     return parser.parse_args()
 
@@ -83,13 +83,14 @@ def make_provider(agent_id: str, provider_type: str, seed=None):
             sys.exit(1)
         return DeepSeekProvider(agent_id=agent_id, api_key=api_key)
 
-    elif provider_type == "anthropic":
-        from ai.anthropic_provider import AnthropicProvider
-        api_key = os.getenv("ANTHROPIC_API_KEY")
+    elif provider_type in ("anthropic", "claude"):
+        from ai.claude_provider import ClaudeProvider
+        api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
         if not api_key:
             logger.error("ANTHROPIC_API_KEY not set in .env")
             sys.exit(1)
-        return AnthropicProvider(agent_id=agent_id, api_key=api_key)
+        model = os.getenv("ANTHROPIC_MODEL", "claude-3-7-sonnet-20250219")
+        return ClaudeProvider(agent_id=agent_id, api_key=api_key, model=model)
 
     elif provider_type == "google":
         from ai.google_provider import GoogleProvider

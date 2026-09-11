@@ -1,4 +1,4 @@
-﻿# AI Strategy Arena
+# AI Strategy Arena
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Test Suite](https://img.shields.io/badge/tests-64%20passed-success)](https://github.com/Mustafa-Caliskan/ai-strategy-arena)
@@ -22,48 +22,37 @@ The framework is decoupled into distinct layers: simulation engine, physical ent
 
 ```
 ai_strategy_arena/
-├── ai/                      # AI Provider interfaces, Prompt Builders, and Validation
-│   ├── base_provider.py     # Base abstract class for LLM and algorithmic providers
-│   ├── openai_provider.py   # OpenAI API provider (default: gpt-4o-mini)
-│   ├── deepseek_provider.py # DeepSeek API provider (default: deepseek-chat / V4 Flash)
-│   ├── baseline_agents.py   # Algorithmic baselines (Greedy, Defensive, Economic, Random)
-│   ├── prompt_builder.py    # Fog-of-War state builder and prompt synthesizer
-│   ├── response_parser.py   # Pydantic JSON parser with schema validation
-│   └── action_validator.py  # 3-tier deterministic action and cost verification
+├── ai/                      # Frontier AI Providers & Strategic Evaluators
+│   ├── base_provider.py     # Base abstract class for LLM providers
+│   ├── claude_provider.py   # Anthropic Claude API provider (Claude Sonnet 5 / 3.7 Sonnet)
+│   ├── anthropic_provider.py# Anthropic compatibility wrapper
+│   ├── openai_provider.py   # OpenAI API provider (gpt-4o-mini / gpt-4o)
+│   ├── deepseek_provider.py # DeepSeek API provider (deepseek-chat)
+│   ├── prompt_builder.py    # Multi-rival state builder and prompt synthesizer
+│   └── response_parser.py   # Pydantic JSON parser with schema validation
 │
-├── game/                    # Core Game Engine and Mechanics
-│   ├── map.py               # 2D Grid implementation with terrain types and structures
-│   ├── pathfinding.py       # A* shortest path algorithm with terrain cost weighting
-│   ├── entities.py          # ArmyEntity, EnvoyEntity, and spatial EntityManager
-│   ├── resources.py         # Multi-resource state (Gold, Food, Wood, Stone, Iron, Influence)
-│   ├── buildings.py         # Structure registry (Farm, Lumber Mill, Mine, Fort, Road, City)
-│   ├── country.py           # Sovereign state attributes, garrisons, scores, and inboxes
-│   ├── combat.py            # Resolution of field clashes, sieges, and territorial captures
-│   ├── economy.py           # Resource yields, consumption rates, and population dynamics
-│   ├── diplomacy.py         # Relational tracking, status transitions, and treaty checks
-│   ├── contracts.py         # Formal pact engine with automated betrayal detection
-│   └── game_state.py        # Perspective-filtered state serialization
+├── backend/                 # 3-Way Tri-Polar Simulation & WebSocket Server
+│   ├── ai/                  # Asynchronous multi-model LLM bridge
+│   │   ├── llm_bridge.py    # Parallel frontier LLM dispatcher (Claude, OpenAI, DeepSeek)
+│   │   └── prompt_builder.py# Fog-of-War tactical prompt synthesizer
+│   ├── game/                # Tri-Polar Hexagonal Engine
+│   │   ├── engine.py        # Bilateral treaties, 6-way envoy state machine & turn loop
+│   │   ├── map.py           # 28x18 Hexagonal map with 3 Keeps and Fog of War
+│   │   └── state.py         # Tri-polar sovereign factions, resources, and diplomacy
+│   ├── benchmark/           # 6-Dimensional Radar Profiler
+│   │   └── evaluator.py     # Real-time military, economic, and diplomatic scoring
+│   ├── static/              # Modern Dark Tactical Web Interface
+│   │   ├── index.html       # Live canvas, 3 HUD faction cards, and radar chart
+│   │   ├── style.css        # Responsive cyber-tactical CSS
+│   │   ├── app.js           # WebSocket streaming and canvas renderer
+│   │   └── assets/          # Faction leader and terrain sprites
+│   ├── main.py              # FastAPI server with WebSocket live stream
+│   └── test_server.py       # Automated integration and benchmark test suite
 │
-├── benchmark/               # Benchmark Engine and Metric Profiling
-│   ├── elo_system.py        # FIDE-standard Elo calculation framework
-│   ├── benchmark_runner.py  # Deterministic round-robin tournament runner
-│   └── behavioral_profiler.py # 6-Dimensional Strategic Behavioral Profiler
-│
-├── simulation/              # Simulation Execution and Event Pipeline
-│   ├── turn_manager.py      # Turn orchestration, lifecycle hooks, and async coordinator
-│   ├── event_system.py      # Structured JSONL decision logger and event bus
-│   └── simulation_runner.py # Headless multi-seed batch execution harness
-│
-├── ui/                      # 2D Desktop Interface (Pygame)
-│   ├── renderer.py          # Async-safe render loop
-│   ├── map_view.py          # Spatial map renderer with structure overlays
-│   ├── scoreboard.py        # Real-time resource metrics and active treaties
-│   ├── event_log.py         # Event telemetry display
-│   └── controls.py          # Simulation speed and lifecycle controls
-│
-├── tests/                   # Automated Pytest suite (64 unit and integration tests)
-├── config/                  # Configuration files for game rules and agents
-└── main.py                  # CLI entry point
+├── start.bat                # 1-Click launcher (starts server and opens browser)
+├── OYNA_3_Model_Arenasi.bat # Alternative 1-click arena launcher
+├── requirements.txt         # Minimal production dependencies
+└── README.md                # Documentation and benchmark specifications
 ```
 
 ---
@@ -95,6 +84,21 @@ Every simulation run tracks and analyzes agent actions across six standardized d
 4. **Adaptability (ADP):** Shannon entropy of action diversity under changing tactical conditions.
 5. **Deception Index (DEC):** Frequency of opportunistically breaking active agreements.
 6. **Long-Term Planning (LTP):** Research prioritization and permanent structure development.
+
+---
+
+## Multi-Agent Frontier LLM Benchmark Matrix
+
+AI Strategy Arena benchmarks frontier language models—including **Anthropic Claude**, **OpenAI GPT-4o**, and **DeepSeek**—across long-horizon game-theoretic domains:
+
+- **Frontier Model Providers (`ai/`):** First-class asynchronous providers with strict schema enforcement:
+  - `ClaudeProvider` (`ai/claude_provider.py`): Leverages Anthropic Claude (Sonnet 5 / 3.7 Sonnet) with extended thinking and structured decision output.
+  - `OpenAIProvider` (`ai/openai_provider.py`): OpenAI API provider with JSON-mode schema validation (default: `gpt-4o-mini` / `gpt-4o`).
+  - `DeepSeekProvider` (`ai/deepseek_provider.py`): DeepSeek reasoning and chat provider for high-speed tactical evaluation.
+- **Long-Term Strategic Planning (LTP):** Benchmarking multi-turn infrastructural resource allocation (farms, mines, forts) and technology tree milestones under dynamic economic constraints.
+- **Asymmetric Diplomacy (ADP):** Evaluating handling of incomplete information and Fog of War, including strategic bluffing, non-aggression negotiation, and traveling envoy correspondence.
+- **Contract Fidelity & Betrayal Dynamics (TRU & DEC):** Studying game-theoretic loyalty vs. opportunism—measuring whether models honor ratified pacts under military pressure or execute opportunistic breaches.
+- **Extended Thinking & Deliberation:** Built-in capability for frontier models to deliberate on complex geopolitical turns before emitting validated action schemas.
 
 ---
 
@@ -147,42 +151,48 @@ cp .env.example .env
 ```ini
 OPENAI_API_KEY=your_openai_api_key_here
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ANTHROPIC_MODEL=claude-sonnet-5
 ```
 
 ---
 
 ## Usage
 
-### Interactive 2D Interface (Pygame)
+### 1-Click Launch (Browser & Interactive Web Dashboard)
+Double-click `OYNA_3_Model_Arenasi.bat` (or `start.bat`), or run via terminal:
 ```bash
-# DeepSeek vs OpenAI
-python main.py --provider-a deepseek --provider-b openai --turns 100
-
-# Algorithmic Baseline Match (Greedy vs Defensive)
-python main.py --provider-a greedy --provider-b defensive --turns 100
-
-# Random Baseline Match
-python main.py --provider-a random --provider-b random --turns 100
+python start.py
 ```
+This automatically boots the FastAPI backend and opens the tactical dashboard in your default browser at `http://localhost:8000`.
 
-### Headless Batch Execution
+### Manual CLI Server
 ```bash
-# Run headless batch simulation across 50 runs
-python main.py --batch 50 --provider-a random --provider-b random
+cd backend
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
-## Testing
+## Testing & Verification
 
-The test suite covers action validation, economy balance, combat resolution, contract lifecycle, A* pathfinding, entity encounters, and behavioral profiling.
+The suite includes end-to-end API, state transition, and multi-model parallel inference verification:
 
 ```bash
-python -m pytest tests/ -v
+python backend/test_server.py
 ```
 
-```
-============================== 64 passed in 11.60s ==============================
+```text
+Root HTML Status: 200
+API State Status: 200
+Initial Turn: 1
+API Map Status: 200 Tiles: 504
+--- Testing 1 Step Turn ---
+Post-step Turn: 2
+API Report Status: 200
+Participants in report: ['side_1', 'side_2', 'side_3']
+
+[SUCCESS] AI Strategy Arena is 100% verified and operational!
 ```
 
 ---

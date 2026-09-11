@@ -64,3 +64,7 @@ help.txt
 
 # Wesnoth map files in wesnoth local install path (keep bridge copies)
 wesnoth/data/
+
+# Local archives and legacy 2-player reference engine (preserved locally, ignored from git)
+legacy_2p_engine/
+archive*/

@@ -57,7 +57,7 @@ class AIDecision(BaseModel):
     def validate_action(cls, v: str) -> str:
         v = v.upper().strip()
         if v not in VALID_ACTIONS:
-            return "DEFEND"
+            raise ValueError(f"Unknown action: {v}")
         return v
 
     @field_validator("sub_action")
